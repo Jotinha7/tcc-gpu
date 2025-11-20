@@ -35,32 +35,9 @@ O repositório contém instâncias:
 
 ## 2. Organização no Projeto
 
-Dentro do repositório do TCC, o dataset foi organizado assim:
-
-```
-data/
-  raw/
-    EUC_Type1_Small/
-    EUC_Type1_Large/
-    EUC_Type5_Small/
-    EUC_Type5_Large/
-    EUC_Type6_Small/
-    EUC_Type6_Large/
-    NON_EUC_Type1_Small/
-    NON_EUC_Type1_Large/
-    NON_EUC_Type5_Small/
-    NON_EUC_Type5_Large/
-    NON_EUC_Type6_Small/
-    NON_EUC_Type6_Large/
-  interim/
-  processed/
-```
-
 - As pastas que começam com `EUC_` contêm instâncias **euclidianas**.  
 - As que começam com `NON_EUC_` contêm instâncias **não-euclidianas**.  
 - Em cada pasta, **cada arquivo `.txt` é uma instância** do problema.
-
-Somente a **estrutura de pastas** é versionada no Git; os dados em si (`data/raw` e `data/processed`) são obtidos ou gerados localmente.
 
 ---
 

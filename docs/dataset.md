@@ -3,8 +3,13 @@
 Este documento descreve o dataset usado neste TCC, extraído do repositório
 **CluSteiner-Dataset**, publicado pelos autores do artigo:
 
-> *An online transfer learning based multifactorial evolutionary algorithm  
-> for solving the clustered Steiner tree problem (2024)*.
+> *An online transfer learning based multifactorial evolutionary algorithm for solving the clustered Steiner tree problem (2024).*
+
+O objetivo é explicar de forma clara:
+- a origem das instâncias;  
+- como o dataset foi adaptado;  
+- o formato de cada arquivo;  
+- e como essas informações serão usadas no projeto.
 
 ---
 
@@ -16,54 +21,64 @@ do problema **Clustered Traveling Salesman Problem (CluTSP)**.
 Os autores do artigo adaptam essas instâncias para o problema  
 **Clustered Steiner Tree (CluSteiner)** com o seguinte processo:
 
-- cada instância possui um conjunto de **vértices terminais obrigatórios** R;  
-- R é dividido em **clusters** (R₁, R₂, ..., Rₕ);  
+- cada instância possui um conjunto de **vértices terminais obrigatórios** (R);  
+- R é dividido em **clusters** (R₁, R₂, …, Rₕ);  
 - todos os vértices em R **devem aparecer na solução**;  
 - vértices fora de R são **Steiner opcionais**.
 
-O repositório original contém instâncias:
+O repositório contém instâncias:
 
-- **Euclidianas** (distância EUC_2D)
-- **Não-Euclidianas** (distâncias arbitrárias)
+- **Euclidianas** (distância EUC_2D);
+- **Não-Euclidianas** (distâncias arbitrárias).
 
 ---
 
 ## 2. Organização no Projeto
 
-A estrutura do dataset dentro do repositório é:
+Dentro do repositório do TCC, o dataset foi organizado assim:
 
+```
 data/
-raw/
-EUC_Type1_Small/
-EUC_Type1_Large/
-EUC_Type5_Small/
-EUC_Type5_Large/
-EUC_Type6_Small/
-EUC_Type6_Large/
-NON_EUC_Type1_Small/
-NON_EUC_Type1_Large/
-NON_EUC_Type5_Small/
-NON_EUC_Type5_Large/
-NON_EUC_Type6_Small/
-NON_EUC_Type6_Large/
+  raw/
+    EUC_Type1_Small/
+    EUC_Type1_Large/
+    EUC_Type5_Small/
+    EUC_Type5_Large/
+    EUC_Type6_Small/
+    EUC_Type6_Large/
+    NON_EUC_Type1_Small/
+    NON_EUC_Type1_Large/
+    NON_EUC_Type5_Small/
+    NON_EUC_Type5_Large/
+    NON_EUC_Type6_Small/
+    NON_EUC_Type6_Large/
+  interim/
+  processed/
+```
 
+- As pastas que começam com `EUC_` contêm instâncias **euclidianas**.  
+- As que começam com `NON_EUC_` contêm instâncias **não-euclidianas**.  
+- Em cada pasta, **cada arquivo `.txt` é uma instância** do problema.
 
-Cada pasta contém dezenas de arquivos `.txt`, onde **cada arquivo representa uma instância**.
+Somente a **estrutura de pastas** é versionada no Git; os dados em si (`data/raw` e `data/processed`) são obtidos ou gerados localmente.
 
 ---
 
-## 3. Estrutura de uma instância
+## 3. Estrutura de uma Instância
 
-Cada arquivo segue o formato inspirado na TSPLIB/GTSP.
+Cada arquivo segue um formato inspirado na TSPLIB/GTSP.
 
-Exemplo (retirado da instância `10berlin52.txt`):
+Exemplo (instância `10berlin52.txt`):
 
+```
 Name : 10berlin52
 DIMENSION : 52
 GTSP_SETS : 10
 NODE_COORD_SECTION
 1 565 575
 2 25 185
+3 345 750
+4 945 685
 ...
 52 1740 245
 GTSP_SET_SECTION
@@ -77,93 +92,101 @@ GTSP_SET_SECTION
 8 8 45 -1
 9 11 12 -1
 10 3 -1
-
-
-A estrutura significa:
+```
 
 ### 3.1. Cabeçalho
 
-- **Name**: nome da instância  
-- **DIMENSION**: número total de vértices (|V|)  
-- **GTSP_SETS**: número de clusters (h)
+- **Name**: nome da instância (ex.: `10berlin52`);  
+- **DIMENSION**: número total de vértices |V|;  
+- **GTSP_SETS**: número de clusters h.
 
 ### 3.2. NODE_COORD_SECTION
 
 Lista (id, x, y) de **todos** os vértices do grafo.
 
-Ex.:  
-`1 565 575` → vértice 1 tem coordenadas (565, 575)
+Exemplo:
+
+- `1 565 575` → vértice 1 tem coordenadas (565, 575);  
+- `2 25 185` → vértice 2 tem coordenadas (25, 185).
+
+Todos os vértices de 1 até DIMENSION aparecem aqui.
 
 ### 3.3. GTSP_SET_SECTION
 
-Esta seção lista **os vértices terminais**, agrupados em clusters.
+Define os **vértices terminais obrigatórios**, agrupados em clusters.
 
-Exemplo interpretado:
+Interpretando o exemplo:
 
-Cluster 1: {1}
-Cluster 2: {13, 28, 52}
-Cluster 3: {2}
-Cluster 4: {16, 20}
-Cluster 5: {4, 40, 46}
-Cluster 6: {9}
-Cluster 7: {33}
-Cluster 8: {8, 45}
-Cluster 9: {11, 12}
-Cluster 10: {3}
+- Cluster 1: {1}  
+- Cluster 2: {13, 28, 52}  
+- Cluster 3: {2}  
+- Cluster 4: {16, 20}  
+- Cluster 5: {4, 40, 46}  
+- Cluster 6: {9}  
+- Cluster 7: {33}  
+- Cluster 8: {8, 45}  
+- Cluster 9: {11, 12}  
+- Cluster 10: {3}
+
+O conjunto total de terminais é:
+
+R = {1, 2, 3, 4, 8, 9, 11, 12, 13, 16, 20, 28, 33, 40, 45, 46, 52}.
 
 ---
 
 ## 4. Terminais e Vértices Steiner
 
-> → A árvore precisa conter **todos os terminais**.
+Na formulação do problema, a árvore de Steiner clusterizada T deve:
 
-Portanto:
+- ser uma árvore de Steiner em G;  
+- conter **todos os vértices terminais** listados nos clusters.
 
-- todos os vértices listados no `GTSP_SET_SECTION` são **terminais obrigatórios**;  
-- qualquer vértice **não listado** é um vértice **Steiner opcional**.
+Logo:
 
-No exemplo `10berlin52`:
+- todos os vértices listados na seção GTSP_SET_SECTION são **terminais obrigatórios**;  
+- qualquer vértice não listado é um **vértice Steiner opcional**.
 
-- DIMENSION = 52  
-- Terminais = 17 vértices  
-- Steiner = 35 vértices
+No exemplo:
 
----
-
-## 5. Tipos de instâncias
-
-O dataset contém seis tipos (1 a 6).  
-Neste TCC utilizamos os tipos 1, 5 e 6 (versões Small e Large).
-
-### Type 1
-Clusters criados com base em regiões estruturadas.
-
-### Type 5
-Clusters definidos por agrupamento geométrico.
-
-### Type 6
-Clusters com estrutura mais irregular.
-
-Cada tipo possui duas variantes:
-
-- **Small** → instâncias pequenas (típico: 50–100 vértices)  
-- **Large** → instâncias grandes (típico: 250–450 vértices)
+- DIMENSION = 52 vértices no grafo;  
+- |R| = 17 terminais;  
+- vértices Steiner = 52 − 17 = 35.
 
 ---
 
-## 6. Resumo para implementação
+## 5. Tipos de Instância
 
-Para cada arquivo `.txt`:
+O dataset possui seis tipos (1 a 6).  
+Utilizamos os **tipos 1, 5 e 6**, em versões **Small** e **Large**, com variantes euclidianas e não-euclidianas.
 
-- Ler `DIMENSION`  
-- Ler lista de vértices (todos são candidatos a Steiner)  
-- Ler `GTSP_SET_SECTION` e anotar:
-  - clusters R₁, R₂, ..., Rₕ  
-  - conjunto total R  
-- Identificar:
-  - |V| = número de vértices  
-  - |R| = número de terminais  
-  - |Steiner| = |V| − |R|  
-  - clusters e seus tamanhos  
-- Salvar em um `.csv` para análise posterior
+### Tipo 1  
+Clusters mais definidos.
+
+### Tipo 5  
+Clusters geométricos.
+
+### Tipo 6  
+Clusters irregulares.
+
+Cada tipo possui versões:
+
+- **Small** → instâncias menores (~50–100 nós)  
+- **Large** → instâncias maiores (~250–450 nós)
+
+---
+
+## 6. Resumo para Implementação
+
+Para cada arquivo `.txt`, o parser deve:
+
+1. Ler o cabeçalho (Name, DIMENSION, GTSP_SETS ou NUMBER_OF_CLUSTERS).  
+2. Ler NODE_COORD_SECTION (coordenadas dos vértices).  
+3. Ler GTSP_SET_SECTION (ou CLUSTER_SECTION nas não-euclidianas).  
+4. Calcular:
+   - número total de vértices;  
+   - número de terminais;  
+   - vértices Steiner opcionais;  
+   - clusters e seus tamanhos.  
+5. Gerar o arquivo CSV em `data/processed/instances.csv`.
+
 

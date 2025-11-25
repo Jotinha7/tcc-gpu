@@ -8,34 +8,35 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # ============================
-# Biblioteca C++ com Dijkstra
+# Biblioteca C++ comum (Dijkstra + MST)
 # ============================
-# src/shortest_paths.cpp implementa a função dijkstra()
+# shortest_paths.cpp  -> dijkstra()
+# mst.cpp             -> kruskal_mst()
 add_library(tcc_cpp
     src/shortest_paths.cpp
+    src/mst.cpp
 )
 
-# Dizer onde estão os headers (include/shortest_paths.hpp)
+# Headers estão em include/
 target_include_directories(tcc_cpp
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 # ============================
-# Executável de teste (Dijkstra)
+# Executável baseline_spmst
 # ============================
-# src/test_shortest_paths.cpp tem o main() de teste
-add_executable(test_shortest_paths
-    src/test_shortest_paths.cpp
+# Usa a biblioteca tcc_cpp
+add_executable(baseline_spmst
+    src/baseline_spmst.cpp
 )
 
-# Liga o executável à biblioteca tcc_cpp (onde está o dijkstra)
-target_link_libraries(test_shortest_paths
+target_link_libraries(baseline_spmst
     PRIVATE tcc_cpp
 )
 
 # ============================
-# Executável CUDA
+# Executável CUDA já existente
 # ============================
 add_executable(device_info
     src/main.cu

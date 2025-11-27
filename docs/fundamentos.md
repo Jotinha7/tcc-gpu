@@ -53,36 +53,117 @@ O problema de Árvore de Steiner Clusterizada (CluSteiner) é definido como:
 
 ---
 
-## 2. Restrição de disjunção (visão conceitual)
+### 2. Restrição de disjunção no CluSteiner
 
-Ao modelar problemas de otimização com clusters, geralmente surgem escolhas do tipo:
+Nesta seção vamos reescrever a **restrição de disjunção** exatamente na forma em que o problema é definido no artigo base do CluSteiner e, em seguida, mostrar como ela aparece na modelagem matemática que vamos usar no TCC.
 
-> “Para este cluster, ou escolho este vértice como representante, ou escolho aquele.”
+---
 
-Cada “ou … ou …” corresponde a uma **restrição de disjunção**: é preciso escolher uma alternativa dentro de um conjunto de opções mutuamente excludentes.
+#### 2.1 Definição no artigo base
 
-Uma forma típica de modelar isso em Programação Inteira é introduzir variáveis binárias de escolha. Exemplo conceitual:
+Considere um grafo ponderado e não-direcionado $G = (V, E, w)$, onde $V$ é o conjunto de vértices, $E$ é o conjunto de arestas e $w : E \to \mathbb{R}_{+}$ é a função de pesos.
 
-- Para cada cluster $R_k$ e para cada vértice $v \in R_k$, definimos uma variável binária $y_{k,v} \in \{0,1\}$, onde:
-  - $y_{k,v} = 1$ se $v$ é escolhido como “representante” do cluster $k$ (por exemplo, ponto por onde o cluster se conecta ao resto da árvore);
-  - $y_{k,v} = 0$ caso contrário.
-
-A restrição de disjunção é então escrita como:
+Seja $R \subseteq V$ o conjunto de **vértices requeridos** (terminais). O artigo define ainda uma partição de $R$ em $k$ clusters:
 
 $$
-\sum_{v \in R_k} y_{k,v} = 1, \quad \text{para todo cluster } k = 1, \dots, h.
+R' = \{R_1, R_2, \dots, R_k\}, \quad R_i \subseteq R, \quad R_i \cap R_j = \emptyset \ (i \neq j), \quad \bigcup_{i=1}^k R_i = R.
 $$
 
-Essa igualdade garante que, para cada cluster, **exatamente um** vértice é escolhido como representante. Conceitualmente, isso vem de uma disjunção:
+Uma solução do CluSteiner é uma árvore de Steiner $T = (V_T, E_T)$ tal que:
 
-> “Ou o representante é o vértice 1, ou o vértice 2, …, ou o vértice $|R_k|$.”
+**1. Condição de Steiner tree**
 
-No artigo base, a ideia geral da restrição de disjunção é controlar a forma como clusters se conectam entre si e ao resto da árvore, evitando soluções em que múltiplas escolhas contraditórias sejam ativadas ao mesmo tempo.
+Todos os vértices requeridos aparecem na árvore:
 
-Para o TCC, o mais importante é entender que:
+$$
+R \subseteq V_T
+$$
 
-- disjunção = “escolha exclusiva” entre várias opções;
-- em modelos de Programação Inteira isso vira um conjunto de variáveis binárias + uma ou mais restrições somando a 1 (ou $\le 1$, dependendo do caso).
+**2. Árvore local de cada cluster**
+
+Para cada cluster $R_i$, define-se a **árvore local** $T_i$ como o menor subgrafo de $T$ que ainda conecta todos os vértices de $R_i$:
+
+$$
+T_i = (V_{T_i}, E_{T_i}) \subseteq T
+$$
+
+com
+
+$$
+R_i \subseteq V_{T_i} \subseteq V_T
+$$
+
+**3. Restrição de exclusão (disjunção) entre árvores locais**
+
+O artigo impõe que as árvores locais sejam **mutuamente disjuntas**:
+
+$$
+V_{T_i} \cap V_{T_j} = \emptyset, \qquad \forall\, 1 \le i < j \le k.
+$$
+
+Em palavras:
+> Nenhum vértice pode pertencer a mais de uma árvore local ao mesmo tempo.
+
+Isso vale tanto para vértices de Steiner quanto, indiretamente, para a forma como os clusters se conectam. Cada vértice (especialmente os de Steiner) é “alocado” a **no máximo um cluster** na solução final.
+
+Essa é a forma em que a *restrição de disjunção* aparece na formulação do artigo: ela é embutida na frase “todas as árvores locais são mutuamente exclusivas”.
+
+---
+
+#### 2.2 Regra de disjunção na modelagem do TCC
+
+Para usar essa ideia em um modelo de Programação Inteira/MIP, introduzimos variáveis binárias que marcam em qual árvore local cada vértice está.
+
+Para cada cluster $i \in \{1, \dots, k\}$ e para cada vértice $v \in V$, definimos:
+
+$$
+y_{i,v} = 
+\begin{cases} 
+1, & \text{se o vértice } v \text{ pertence à árvore local } T_i, \\
+0, & \text{caso contrário.}
+\end{cases}
+$$
+
+Com essas variáveis, a restrição de que **cada vértice de Steiner pertence a no máximo uma árvore local** é escrita como:
+
+$$
+\sum_{i=1}^{k} y_{i,v} \le 1, \qquad \forall\, v \in V \setminus R. \quad \text{(Disjunção-1)}
+$$
+
+**Interpretando:**
+
+Para cada vértice $v$ que **não** é terminal (logo, $v \in V \setminus R$), as variáveis $\{y_{1,v}, y_{2,v}, \dots, y_{k,v}\}$ não podem ser 1 ao mesmo tempo.
+
+Em lógica, isso significa:
+
+> O vértice $v$ está na árvore local do cluster 1 **ou** na do cluster 2 **ou** ... **ou** não está em nenhuma árvore local.
+
+**Para os vértices terminais, a regra é diferente:**
+
+Se $r \in R_i$ é um terminal do cluster $i$, então ele **deve** estar na árvore local $T_i$:
+
+$$
+y_{i,r} = 1, \qquad \forall\, r \in R_i. \quad \text{(Disjunção-2)}
+$$
+
+( Opcionalmente, podemos forçar $y_{j,r} = 0$ para $j \neq i$, mas isso já é consequência da restrição Disjunção-1 se considerarmos que o terminal só pode pertencer ao seu próprio cluster. )
+
+Juntas, (Disjunção-1) e (Disjunção-2) codificam, em forma linear, a mesma ideia da definição do artigo:
+
+1.  Todos os vértices de um cluster aparecem em sua árvore local;
+2.  Nenhum vértice é compartilhado entre árvores locais de clusters diferentes.
+
+Em resumo, a **restrição de disjunção** do TCC será representada pelas seguintes condições:
+
+$$
+\begin{aligned}
+& y_{i,v} \in \{0,1\}, && \forall i = 1,\dots,k,\ \forall v \in V, \\
+& y_{i,r} = 1, && \forall i = 1,\dots,k,\ \forall r \in R_i, \\
+& \sum_{i=1}^{k} y_{i,v} \le 1, && \forall v \in V \setminus R.
+\end{aligned}
+$$
+
+Essas equações são a forma “oficial” da restrição de disjunção na formulação matemática do TCC, coerente com a definição de que as árvores locais $T_i$ devem ser mutuamente exclusivas.
 
 ---
 

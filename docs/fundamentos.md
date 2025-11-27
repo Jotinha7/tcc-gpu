@@ -57,7 +57,7 @@ O problema de Árvore de Steiner Clusterizada (CluSteiner) é definido como:
 
 Nesta seção vamos reescrever a **restrição de disjunção** exatamente na forma em que o problema é definido no artigo base do CluSteiner e, em seguida, mostrar como ela aparece na modelagem matemática que vamos usar no TCC.
 
-#### 2.1 Definição no artigo base
+### 2.1 Definição no artigo base
 
 Considere um grafo ponderado e não-direcionado $G = (V, E, w)$, onde $V$ é o conjunto de vértices, $E$ é o conjunto de arestas e $w : E \to \mathbb{R}_{+}$ é a função de pesos.
 
@@ -106,7 +106,7 @@ Isso vale tanto para vértices de Steiner quanto, indiretamente, para a forma co
 
 Essa é a forma em que a *restrição de disjunção* aparece na formulação do artigo: ela é embutida na frase “todas as árvores locais são mutuamente exclusivas”.
 
-#### 2.2 Regra de disjunção na modelagem do TCC
+### 2.2 Regra de disjunção na modelagem do TCC
 
 Para usar essa ideia em um modelo de Programação Inteira/MIP, introduzimos variáveis binárias que marcam em qual árvore local cada vértice está.
 

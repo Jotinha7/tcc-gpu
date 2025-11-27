@@ -53,11 +53,9 @@ O problema de Árvore de Steiner Clusterizada (CluSteiner) é definido como:
 
 ---
 
-### 2. Restrição de disjunção no CluSteiner
+## 2. Restrição de disjunção no CluSteiner
 
 Nesta seção vamos reescrever a **restrição de disjunção** exatamente na forma em que o problema é definido no artigo base do CluSteiner e, em seguida, mostrar como ela aparece na modelagem matemática que vamos usar no TCC.
-
----
 
 #### 2.1 Definição no artigo base
 
@@ -107,8 +105,6 @@ Em palavras:
 Isso vale tanto para vértices de Steiner quanto, indiretamente, para a forma como os clusters se conectam. Cada vértice (especialmente os de Steiner) é “alocado” a **no máximo um cluster** na solução final.
 
 Essa é a forma em que a *restrição de disjunção* aparece na formulação do artigo: ela é embutida na frase “todas as árvores locais são mutuamente exclusivas”.
-
----
 
 #### 2.2 Regra de disjunção na modelagem do TCC
 

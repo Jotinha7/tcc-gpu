@@ -10,9 +10,11 @@ dist/
 *.out
 
 # data
-data/raw/
-data/interim/
-data/processed/
+data/
 
 # vscode
 .vscode/
+
+# python packaging (gerado automaticamente)
+*.egg-info/
+

@@ -9,4 +9,5 @@ from .operators_destroy import (
 
 from .operators_repair import (
     repair_r1_dijkstra,
+    repair_r3_mst_components,
 )

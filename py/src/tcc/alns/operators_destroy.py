@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from typing import List, Tuple
 import random
-from typing import Dict, List, Tuple
 
 from tcc.instance import Instance
 from tcc.solution import Solution, TreeEdge
@@ -9,40 +10,43 @@ from tcc.solution import Solution, TreeEdge
 from .partial_state import PartialState
 
 
-def _norm_edge(e: TreeEdge) -> TreeEdge:
-    u, v = e
+def _norm_edge(u: int, v: int) -> TreeEdge:
     return (u, v) if u < v else (v, u)
 
 
-def split_local_global_edges(inst: Instance, edges: List[TreeEdge]) -> Tuple[List[TreeEdge], List[TreeEdge]]:
+def split_local_global_edges(instance: Instance, edges: List[TreeEdge]) -> Tuple[List[TreeEdge], List[TreeEdge]]:
     """
-    Separa arestas em:
-      - local: endpoints no MESMO cluster, ou envolvendo Steiner (-1)
-      - global: endpoints em clusters DIFERENTES (ambos >= 0)
+    Definição usada a partir daqui:
 
-    Só vamos remover arestas globais.
+    - LOCAL: aresta entre dois terminais do MESMO cluster.
+    - GLOBAL: todo o resto (inclui:
+        * terminal-terminal de clusters diferentes
+        * steiner-terminal
+        * steiner-steiner (se existir)
+      )
+
+    Isso é necessário porque, se o ALNS começar a usar Steiner para “colar” componentes,
+    essas arestas precisam contar como parte da conectividade (global).
     """
-    local_edges: List[TreeEdge] = []
-    global_edges: List[TreeEdge] = []
+    local: List[TreeEdge] = []
+    global_: List[TreeEdge] = []
 
     for (u, v) in edges:
-        u, v = _norm_edge((u, v))
-        cu = inst.cluster_of[u]
-        cv = inst.cluster_of[v]
+        cu = instance.cluster_of[u]
+        cv = instance.cluster_of[v]
 
-        # global só se ambos são terminais (cluster >=0) e clusters diferentes
-        if cu != -1 and cv != -1 and cu != cv:
-            global_edges.append((u, v))
+        if cu != -1 and cv != -1 and cu == cv:
+            local.append(_norm_edge(u, v))
         else:
-            local_edges.append((u, v))
+            global_.append(_norm_edge(u, v))
 
-    return local_edges, global_edges
+    return local, global_
 
 
-class _DSU:
-    def __init__(self, n: int):
+class DSU:
+    def __init__(self, n: int) -> None:
         self.p = list(range(n))
-        self.sz = [1] * n
+        self.r = [0] * n
 
     def find(self, a: int) -> int:
         while self.p[a] != a:
@@ -51,169 +55,134 @@ class _DSU:
         return a
 
     def union(self, a: int, b: int) -> None:
-        ra = self.find(a)
-        rb = self.find(b)
+        ra, rb = self.find(a), self.find(b)
         if ra == rb:
             return
-        if self.sz[ra] < self.sz[rb]:
+        if self.r[ra] < self.r[rb]:
             ra, rb = rb, ra
         self.p[rb] = ra
-        self.sz[ra] += self.sz[rb]
+        if self.r[ra] == self.r[rb]:
+            self.r[ra] += 1
 
 
-def compute_cluster_components(inst: Instance, global_edges_remaining: List[TreeEdge]) -> Tuple[List[List[int]], List[int]]:
+def compute_cluster_components(instance: Instance, global_edges: List[TreeEdge]) -> List[List[int]]:
     """
-    Calcula componentes conectados no nível de clusters, usando SOMENTE arestas globais restantes.
+    Componentes no nível de CLUSTERS, mas levando em conta caminhos que passam por Steiner.
 
-    Retorna:
-      components: List[List[cluster_id]]
-      cluster_to_component: List[int] com tamanho h
+    Ideia:
+    - DSU em todos os vértices
+    - Primeiro “contrai” cada cluster: une todos os terminais do mesmo cluster no DSU
+      (assim o cluster vira 1 supernó)
+    - Depois une endpoints de todas as arestas globais (incluindo steiner-terminal)
+    - No final, clusters com o mesmo root no DSU estão no mesmo componente.
     """
-    h = len(inst.clusters)
-    if h == 0:
-        return [], []
+    dsu = DSU(instance.n)
 
-    dsu = _DSU(h)
-
-    for (u, v) in global_edges_remaining:
-        cu = inst.cluster_of[u]
-        cv = inst.cluster_of[v]
-        if cu == -1 or cv == -1 or cu == cv:
+    # contrai cada cluster
+    for cid, terminals in enumerate(instance.clusters):
+        if not terminals:
             continue
-        dsu.union(cu, cv)
+        t0 = terminals[0]
+        for t in terminals[1:]:
+            dsu.union(t0, t)
 
-    groups: Dict[int, List[int]] = {}
-    for k in range(h):
-        r = dsu.find(k)
-        groups.setdefault(r, []).append(k)
+    # une arestas globais (inclui Steiner)
+    for (u, v) in global_edges:
+        dsu.union(u, v)
 
-    # ordenação estável
-    components = []
-    for comp in groups.values():
-        comp.sort()
-        components.append(comp)
-    components.sort(key=lambda comp: comp[0])
+    root_to_clusters = {}
+    for cid, terminals in enumerate(instance.clusters):
+        t0 = terminals[0]
+        r = dsu.find(t0)
+        root_to_clusters.setdefault(r, []).append(cid)
 
-    cluster_to_component = [-1] * h
-    for cid, comp in enumerate(components):
-        for k in comp:
-            cluster_to_component[k] = cid
+    return list(root_to_clusters.values())
 
-    return components, cluster_to_component
+def _build_cluster_to_component(num_clusters: int, components: list[list[int]]) -> list[int]:
+    out = [-1] * num_clusters
+    for comp_id, comp in enumerate(components):
+        for c in comp:
+            out[c] = comp_id
+    return out
 
 
-# -------------------------
-# DESTROY OPERATORS (Dia 2)
-# -------------------------
+def destroy_d1_remove_k_global_edges(instance, solution, rng: random.Random, k: int = 2) -> PartialState:
+    local_edges, global_edges = split_local_global_edges(instance, solution.edges)
 
-def destroy_remove_k_global_edges(
-    inst: Instance,
-    solution: Solution,
-    rng: random.Random,
-    k: int = 2,
-) -> PartialState:
-    """
-    D1: remove k arestas GLOBAIS aleatórias.
-    """
-    local_edges, global_edges = split_local_global_edges(inst, solution.edges)
-
-    if not global_edges:
-        comps, c2c = compute_cluster_components(inst, [])
+    if len(global_edges) == 0:
+        components = compute_cluster_components(instance, global_edges)
+        cluster_to_component = _build_cluster_to_component(len(instance.clusters), components)
         return PartialState(
             base_solution=solution,
             local_edges=local_edges,
-            global_edges_remaining=[],
+            global_edges_remaining=global_edges,
             global_edges_removed=[],
-            components=comps,
-            cluster_to_component=c2c,
-            meta={"op": "D1_remove_k_global_edges", "k": 0},
+            components=components,
+            cluster_to_component=cluster_to_component,
+            destroyed_cluster=None,
+            meta={"destroy_op": "D1_remove_k_global_edges", "k": 0},
         )
 
-    k_eff = min(k, len(global_edges))
-    removed = rng.sample(global_edges, k_eff)
+    kk = min(k, len(global_edges))
+    removed = rng.sample(global_edges, kk)
     removed_set = set(removed)
-
     remaining = [e for e in global_edges if e not in removed_set]
 
-    comps, c2c = compute_cluster_components(inst, remaining)
+    components = compute_cluster_components(instance, remaining)
+    cluster_to_component = _build_cluster_to_component(len(instance.clusters), components)
+
     return PartialState(
         base_solution=solution,
         local_edges=local_edges,
         global_edges_remaining=remaining,
         global_edges_removed=removed,
-        components=comps,
-        cluster_to_component=c2c,
-        meta={"op": "D1_remove_k_global_edges", "k": k_eff},
+        components=components,
+        cluster_to_component=cluster_to_component,
+        destroyed_cluster=None,
+        meta={"destroy_op": "D1_remove_k_global_edges", "k": kk},
     )
 
 
-def destroy_disconnect_cluster(
-    inst: Instance,
-    solution: Solution,
-    rng: random.Random,
-) -> PartialState:
-    """
-    D2: escolhe um cluster c e remove 1 aresta global incidente a ele.
-    """
-    local_edges, global_edges = split_local_global_edges(inst, solution.edges)
-    h = len(inst.clusters)
+def destroy_d2_disconnect_cluster(instance, solution, rng: random.Random) -> PartialState:
+    local_edges, global_edges = split_local_global_edges(instance, solution.edges)
 
-    if h <= 1 or not global_edges:
-        comps, c2c = compute_cluster_components(inst, global_edges)
+    num_clusters = len(instance.clusters)
+    c = rng.randrange(num_clusters)
+    terminals = set(instance.clusters[c])
+
+    incident = [e for e in global_edges if (e[0] in terminals) or (e[1] in terminals)]
+
+    if not incident:
+        components = compute_cluster_components(instance, global_edges)
+        cluster_to_component = _build_cluster_to_component(num_clusters, components)
         return PartialState(
             base_solution=solution,
             local_edges=local_edges,
             global_edges_remaining=global_edges,
             global_edges_removed=[],
-            components=comps,
-            cluster_to_component=c2c,
-            destroyed_cluster=None,
-            meta={"op": "D2_disconnect_cluster", "removed": 0},
-        )
-
-    # tenta achar um cluster com pelo menos 1 aresta incidente
-    clusters = list(range(h))
-    rng.shuffle(clusters)
-
-    chosen_cluster = None
-    incident: List[TreeEdge] = []
-    for c in clusters:
-        incident = []
-        for (u, v) in global_edges:
-            cu = inst.cluster_of[u]
-            cv = inst.cluster_of[v]
-            if cu == c or cv == c:
-                incident.append((u, v))
-        if incident:
-            chosen_cluster = c
-            break
-
-    if chosen_cluster is None:
-        # não achou nada (bem improvável se global_edges existe)
-        comps, c2c = compute_cluster_components(inst, global_edges)
-        return PartialState(
-            base_solution=solution,
-            local_edges=local_edges,
-            global_edges_remaining=global_edges,
-            global_edges_removed=[],
-            components=comps,
-            cluster_to_component=c2c,
-            destroyed_cluster=None,
-            meta={"op": "D2_disconnect_cluster", "removed": 0},
+            components=components,
+            cluster_to_component=cluster_to_component,
+            destroyed_cluster=c,
+            meta={"destroy_op": "D2_disconnect_cluster", "note": "no incident global edge"},
         )
 
     removed_edge = rng.choice(incident)
-    removed_set = {removed_edge}
-    remaining = [e for e in global_edges if e not in removed_set]
+    remaining = [e for e in global_edges if e != removed_edge]
 
-    comps, c2c = compute_cluster_components(inst, remaining)
+    components = compute_cluster_components(instance, remaining)
+    cluster_to_component = _build_cluster_to_component(num_clusters, components)
+
     return PartialState(
         base_solution=solution,
         local_edges=local_edges,
         global_edges_remaining=remaining,
         global_edges_removed=[removed_edge],
-        components=comps,
-        cluster_to_component=c2c,
-        destroyed_cluster=chosen_cluster,
-        meta={"op": "D2_disconnect_cluster", "removed": 1},
+        components=components,
+        cluster_to_component=cluster_to_component,
+        destroyed_cluster=c,
+        meta={"destroy_op": "D2_disconnect_cluster"},
     )
+
+
+destroy_remove_k_global_edges = destroy_d1_remove_k_global_edges
+destroy_disconnect_cluster = destroy_d2_disconnect_cluster

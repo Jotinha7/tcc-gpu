@@ -70,6 +70,12 @@ def dijkstra_all(
 
     return dist, parent
 
+def _build_cluster_to_component(num_clusters: int, components: List[List[int]]) -> List[int]:
+    out = [-1] * num_clusters
+    for comp_id, comp in enumerate(components):
+        for c in comp:
+            out[c] = comp_id
+    return out
 
 def reconstruct_path_edges(parent: List[int], target: int) -> List[TreeEdge]:
     """
@@ -107,7 +113,8 @@ def repair_r1_dijkstra(inst: Instance, ps: PartialState, rng: random.Random) -> 
     global_set = set(global_edges)
 
     while True:
-        components, cluster_to_component = compute_cluster_components(inst, global_edges)
+        components = compute_cluster_components(inst, global_edges)
+        cluster_to_component = _build_cluster_to_component(len(inst.clusters), components)
         if len(components) <= 1:
             break
 
@@ -224,7 +231,8 @@ def repair_r3_mst_components(inst: Instance, ps: PartialState, rng: random.Rando
     global_edges = [_norm_edge(e) for e in ps.global_edges_remaining]
     global_set = set(global_edges)
 
-    components, cluster_to_component = compute_cluster_components(inst, global_edges)
+    components = compute_cluster_components(inst, global_edges)
+    cluster_to_component = _build_cluster_to_component(len(inst.clusters), components)
     c = len(components)
 
     if c <= 1:
@@ -305,4 +313,73 @@ def repair_r3_mst_components(inst: Instance, ps: PartialState, rng: random.Rando
 
     final_edges = list(local_edges) + list(global_edges)
     cost = sum(wlookup[(u, v)] for (u, v) in final_edges)
+    return Solution(instance_name=inst.name, cost=cost, edges=final_edges)
+
+
+def repair_r1_dijkstra_topL(inst: Instance, ps: PartialState, rng: random.Random, L: int = 5) -> Solution:
+    """
+    R1-TopL:
+      igual ao R1, mas ao conectar uma componente com outra,
+      escolhe aleatoriamente um alvo entre os TOP-L melhores (menor dist).
+
+    Isso gera diversidade.
+    """
+    adj = build_adj(inst)
+    w = build_weight_lookup(inst)
+
+    local_edges = [_norm_edge(e) for e in ps.local_edges]
+    global_edges = [_norm_edge(e) for e in ps.global_edges_remaining]
+    global_set = set(global_edges)
+
+    while True:
+        components = compute_cluster_components(inst, global_edges)
+        cluster_to_component = _build_cluster_to_component(len(inst.clusters), components)
+
+        if len(components) <= 1:
+            break
+
+        # componente base
+        if ps.destroyed_cluster is not None:
+            base_component_id = cluster_to_component[ps.destroyed_cluster]
+        else:
+            base_component_id = rng.randrange(len(components))
+
+        base_clusters = components[base_component_id]
+
+        sources: List[int] = []
+        for ck in base_clusters:
+            sources.extend(inst.clusters[ck])
+
+        dist, parent = dijkstra_all(inst, adj, sources)
+
+        # candidatos: todos terminais fora da componente base
+        cand: List[Tuple[float, int]] = []
+        for k in range(len(inst.clusters)):
+            if cluster_to_component[k] == base_component_id:
+                continue
+            for v in inst.clusters[k]:
+                cand.append((dist[v], v))
+
+        cand.sort(key=lambda x: x[0])
+        if not cand or cand[0][0] >= 10**29:
+            raise RuntimeError("R1-TopL: não encontrou conexão para outra componente (inesperado).")
+
+        # escolhe aleatoriamente entre os TOP-L
+        L_eff = min(L, len(cand))
+        _, target = rng.choice(cand[:L_eff])
+
+        path_edges = reconstruct_path_edges(parent, target)
+        if not path_edges:
+            raise RuntimeError("R1-TopL: caminho reconstruído vazio (inesperado).")
+
+        for e in path_edges:
+            if e not in global_set:
+                global_set.add(e)
+                global_edges.append(e)
+
+    final_edges = list(local_edges) + list(global_edges)
+    cost = 0.0
+    for (u, v) in final_edges:
+        cost += w[(u, v)]
+
     return Solution(instance_name=inst.name, cost=cost, edges=final_edges)

@@ -10,7 +10,10 @@ from .operators_destroy import (
 
 from .operators_repair import (
     repair_r1_dijkstra,
+    repair_r1_dijkstra_topL,
     repair_r3_mst_components,
 )
+
+from .operators_repair_steiner import repair_r4_steiner_hub
 
 from .alns_sa import run_alns_sa
